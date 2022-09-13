@@ -80,7 +80,7 @@ public class ApiConfig {
     }
 
     public void loadConfig(boolean useCache, LoadConfigCallback callback, Activity activity) {
-        String apiUrl = Hawk.get(HawkConfig.API_URL, "");
+        String apiUrl = Hawk.get(HawkConfig.API_URL, "http://alist.nebula-nas.space:666/d/json/cat.json?pw=b3a3a10687d1d25b");
         if (apiUrl.isEmpty()) {
             callback.error("-1");
             return;
