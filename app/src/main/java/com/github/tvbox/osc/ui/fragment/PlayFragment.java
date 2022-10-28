@@ -12,10 +12,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
 import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
 import android.webkit.SslErrorHandler;
@@ -340,10 +342,8 @@ public class PlayFragment extends BaseLazyFragment {
     void setSubtitleViewTextStyle(int style) {
         if (style == 0) {
             mController.mSubtitleView.setTextColor(getContext().getResources().getColorStateList(R.color.color_FFFFFF));
-            mController.mSubtitleView.setShadowLayer(3, 2, 2, R.color.color_CC000000);
         } else if (style == 1) {
             mController.mSubtitleView.setTextColor(getContext().getResources().getColorStateList(R.color.color_FFB6C1));
-            mController.mSubtitleView.setShadowLayer(3, 2, 2, R.color.color_FFFFFF);
         }
     }
 
@@ -1425,6 +1425,12 @@ public class PlayFragment extends BaseLazyFragment {
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             return false;
         }
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            return false;
+        }
+
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             super.onPageStarted( view,  url, favicon);
@@ -1457,6 +1463,13 @@ public class PlayFragment extends BaseLazyFragment {
                 }
                 return null;
             }
+
+            boolean isFilter = VideoParseRuler.isFilter(webUrl, url);
+            if (isFilter) {
+                LOG.i( "shouldInterceptLoadRequest filter:" + url);
+                return null;
+            }
+
             boolean ad;
             if (!loadedUrls.containsKey(url)) {
                 ad = AdBlocker.isAd(url);
@@ -1473,11 +1486,9 @@ public class PlayFragment extends BaseLazyFragment {
                     if (loadFoundCount.incrementAndGet() == 1) {
                         url = loadFoundVideoUrls.poll();
                         mHandler.removeMessages(100);
-                        if (headers != null && !headers.isEmpty()) {
-                            playUrl(url, headers);
-                        } else {
-                            playUrl(url, null);
-                        }
+                        String cookie = CookieManager.getInstance().getCookie(url);
+                        if(!TextUtils.isEmpty(cookie))headers.put("Cookie", cookie);//携带cookie
+                        playUrl(url, headers);
                         stopLoadWebView(false);
                     }
                 }
@@ -1491,7 +1502,7 @@ public class PlayFragment extends BaseLazyFragment {
         @Nullable
         @Override
         public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
-            WebResourceResponse response = checkIsVideo(url, null);
+            WebResourceResponse response = checkIsVideo(url, new HashMap<>());
             return response;
         }
 
@@ -1507,14 +1518,12 @@ public class PlayFragment extends BaseLazyFragment {
                 for (String k : hds.keySet()) {
                     if (k.equalsIgnoreCase("user-agent")
                             || k.equalsIgnoreCase("referer")
-                            || k.equalsIgnoreCase("origin")
-                            || k.equalsIgnoreCase("cookie")) {
-                        webHeaders.put(k, hds.get(k));
+                            || k.equalsIgnoreCase("origin")) {
+                        webHeaders.put(k," " + hds.get(k));
                     }
                 }
             }
-            WebResourceResponse response = checkIsVideo(url, webHeaders);
-            return response;
+            return checkIsVideo(url, webHeaders);
         }
 
         @Override
@@ -1628,6 +1637,13 @@ public class PlayFragment extends BaseLazyFragment {
                 }
                 return null;
             }
+
+            boolean isFilter = VideoParseRuler.isFilter(webUrl, url);
+            if (isFilter) {
+                LOG.i( "shouldInterceptLoadRequest filter:" + url);
+                return null;
+            }
+
             boolean ad;
             if (!loadedUrls.containsKey(url)) {
                 ad = AdBlocker.isAd(url);
@@ -1644,9 +1660,8 @@ public class PlayFragment extends BaseLazyFragment {
                         for (String k : hds.keySet()) {
                             if (k.equalsIgnoreCase("user-agent")
                                     || k.equalsIgnoreCase("referer")
-                                    || k.equalsIgnoreCase("origin")
-                                    || k.equalsIgnoreCase("cookie")) {
-                                webHeaders.put(k, hds.get(k));
+                                    || k.equalsIgnoreCase("origin")) {
+                                webHeaders.put(k," " + hds.get(k));
                             }
                         }
                     }
@@ -1656,11 +1671,9 @@ public class PlayFragment extends BaseLazyFragment {
                     if (loadFoundCount.incrementAndGet() == 1) {
                         mHandler.removeMessages(100);
                         url = loadFoundVideoUrls.poll();
-                        if (!webHeaders.isEmpty()) {
-                            playUrl(url, webHeaders);
-                        } else {
-                            playUrl(url, null);
-                        }
+                        String cookie = CookieManager.getInstance().getCookie(url);
+                        if(!TextUtils.isEmpty(cookie))webHeaders.put("Cookie", cookie);//携带cookie
+                        playUrl(url, webHeaders);
                         stopLoadWebView(false);
                     }
                 }
